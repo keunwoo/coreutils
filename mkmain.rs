@@ -1,11 +1,12 @@
-#![feature(core, exit_status, old_io, old_path)]
 use std::env;
-use std::old_io::{File, Truncate, ReadWrite};
-use std::old_path::Path;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::Path;
+use std::process::exit;
 
 static TEMPLATE: &'static str = "\
 #![feature(exit_status)]
-extern crate \"@UTIL_CRATE@\" as uu@UTIL_CRATE@;
+extern crate @UTIL_CRATE@ as uu@UTIL_CRATE@;
 
 use std::env;
 use uu@UTIL_CRATE@::uumain;
@@ -19,18 +20,20 @@ fn main() {
     let args : Vec<String> = env::args().collect();
     if args.len() != 3 {
         println!("usage: mkbuild <crate> <outfile>");
-        env::set_exit_status(1);
-        return;
+        exit(1);
     }
 
-    let crat    = args[1].as_slice();
-    let outfile = args[2].as_slice();
+    let crat    : &str = args[1].as_ref();
+    let outfile : &str = args[2].as_ref();
 
     let main = TEMPLATE.replace("@UTIL_CRATE@", crat);
-    let mut out = File::open_mode(&Path::new(outfile), Truncate, ReadWrite);
-
-    match out.write_all(main.as_bytes()) {
+    let out = OpenOptions::new().create(true).read(true).write(true).truncate(true)
+        .open(&Path::new(outfile));
+    match out {
         Err(e) => panic!("{}", e),
-        _ => (),
+        Ok(mut f) => match f.write_all(main.as_bytes()) {
+            Err(e) => panic!("{}", e),
+            Ok(_) => ()
+        }
     }
 }
